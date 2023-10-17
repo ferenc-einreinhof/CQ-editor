@@ -19,6 +19,7 @@ ZOOM_STEP = 0.9
 class OCCTWidget(QWidget):
     
     sigObjectSelected = pyqtSignal(list)
+    sigFitAll = pyqtSignal()
     
     def __init__(self,parent=None):
         
@@ -38,6 +39,8 @@ class OCCTWidget(QWidget):
         self.viewer = V3d_Viewer(self.graphics_driver)
         self.view = self.viewer.CreateView()
         self.context = AIS_InteractiveContext(self.viewer)
+        self.blockSelection = False
+        # self.lastSelected = None
         
         #Trihedorn, lights, etc
         self.prepare_display()
@@ -81,7 +84,13 @@ class OCCTWidget(QWidget):
             self.view.StartZoomAtPoint(pos.x(), pos.y())
         
         self.old_pos = pos
-            
+        self.blockSelection = False
+
+    def mouseDoubleClickEvent(self,event):
+
+        self.blockSelection = True
+        self.context.FitSelected(self.view, 0.33, True)
+
     def mouseMoveEvent(self,event):
         
         pos = event.pos()
@@ -99,24 +108,26 @@ class OCCTWidget(QWidget):
                                   x, self.old_pos.y())
         
         self.old_pos = pos
+        self.blockSelection = True
         
     def mouseReleaseEvent(self,event):
         
         if event.button() == Qt.LeftButton:
-            pos = event.pos()
-            x,y = pos.x(),pos.y()
-            
-            self.context.MoveTo(x,y,self.view,True)
-            
-            self._handle_selection()
-            
+            if not self.blockSelection:
+                pos = event.pos()
+                x,y = pos.x(),pos.y()
+                self.context.MoveTo(x,y,self.view,True)
+                self._handle_selection()
+
     def _handle_selection(self):
         
         self.context.Select(True)
         self.context.InitSelected()
         
         selected = []
+        # self.lastSelected = None
         if self.context.HasSelectedShape():
+            # self.lastSelected = self.context.SelectedInteractive()
             selected.append(self.context.SelectedShape())
         
         self.sigObjectSelected.emit(selected)
@@ -151,6 +162,8 @@ class OCCTWidget(QWidget):
         }
 
         self.view.SetWindow(wins.get(platform,self._get_window_linux)(self.winId()))
+
+        self.sigFitAll.emit()
 
         self._initialized = True
         

@@ -55,6 +55,7 @@ class OCCViewer(QWidget,ComponentMixin):
 
         self.canvas = OCCTWidget()
         self.canvas.sigObjectSelected.connect(self.handle_selection)
+        self.canvas.sigFitAll.connect(self.fit)
 
         self.create_actions(self)
 
@@ -155,11 +156,22 @@ class OCCViewer(QWidget,ComponentMixin):
                                   parent,
                                   shortcut='shift+F9',
                                   triggered=self.wireframe_view),
-                                  QAction(qta.icon('fa.square'),
-                                          'Shaded (Shift+F10)',
-                                          parent,
-                                          shortcut='shift+F10',
-                                          triggered=self.shaded_view)],
+                          QAction(qta.icon('fa.square'),
+                                  'Shaded (Shift+F10)',
+                                  parent,
+                                  shortcut='shift+F10',
+                                  triggered=self.shaded_view),
+                          QAction(QIcon('icons/perspective-view.256x256.png'),
+                                  'Perspective view (Shift+F11)',
+                                  parent,
+                                  shortcut='shift+F11',
+                                  triggered=self.perspective_view),
+                          QAction(QIcon('icons/orthogonal-view.256x256.png'),
+                                  'Orthographic view (Shift+F12)',
+                                  parent,
+                                  shortcut='shift+F12',
+                                  triggered=self.orthographic_view)],
+
                  'Tools' : [QAction(icon('screenshot'),
                                    'Screenshot',
                                    parent,
@@ -281,10 +293,26 @@ class OCCViewer(QWidget,ComponentMixin):
         c = self._get_context()
         c.SetDisplayMode(AIS_Shaded, True)
 
+    def perspective_view(self):
+
+        self.set_projection_mode('Perspective')
+
+    def orthographic_view(self):
+
+        self.set_projection_mode('Orthographic')
+
     def wireframe_view(self):
 
         c = self._get_context()
         c.SetDisplayMode(AIS_WireFrame, True)
+
+    def set_projection_mode(self, mode):
+
+        self.canvas.update()
+        v = self._get_view()
+        camera = v.Camera()
+        camera.SetProjectionType(getattr(Graphic3d_Camera, f'Projection_{mode}',
+                                         Graphic3d_Camera.Projection_Orthographic))
 
     def show_grid(self,
                   step=1.,

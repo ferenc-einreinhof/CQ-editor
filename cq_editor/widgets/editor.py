@@ -265,6 +265,8 @@ class Editor(CodeEditor,ComponentMixin):
         if filename and self.filename == '':
             try:
                 self.load_from_file(filename)
+                if self.preferences['Autoreload']:
+                    self.triggerRerender.emit(True)
             except IOError:
                 self._logger.warning(f'could not open {filename}')
 
