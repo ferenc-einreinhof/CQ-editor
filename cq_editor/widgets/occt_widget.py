@@ -1,28 +1,25 @@
+import math
 from sys import platform
 
-
-from PyQt5.QtWidgets import QWidget, QApplication
-from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt, QEvent
-
-import OCP
-
+from OCP.AIS import AIS_InteractiveContext, AIS_DisplayMode
 from OCP.Aspect import Aspect_DisplayConnection, Aspect_TypeOfTriedronPosition
 from OCP.OpenGl import OpenGl_GraphicDriver
-from OCP.V3d import V3d_Viewer
-from OCP.AIS import AIS_InteractiveContext, AIS_DisplayMode
 from OCP.Quantity import Quantity_Color
+from OCP.V3d import V3d_Viewer
+from OCP.gp import gp_Trsf, gp_Ax1, gp_Dir
+from PyQt5.QtCore import pyqtSignal, Qt, QPoint
+from PyQt5.QtWidgets import QWidget
 
-
-ZOOM_STEP = 0.9
-
-   
 class OCCTWidget(QWidget):
     
     sigObjectSelected = pyqtSignal(list)
     sigFitAll = pyqtSignal()
     
-    def __init__(self,parent=None):
-        
+    def __init__(self, parent=None, *,
+                 orbital_rotation: bool = True,
+                 rotate_step: float = 0.008,
+                 zoom_step: float = 0.1):
+
         super(OCCTWidget,self).__init__(parent)
         
         self.setAttribute(Qt.WA_NativeWindow)
@@ -31,7 +28,11 @@ class OCCTWidget(QWidget):
         
         self._initialized = False
         self._needs_update = False
-        
+        self._old_pos = QPoint(0, 0)
+        self._rotate_step = rotate_step
+        self._zoom_step = zoom_step
+        self._orbital_rotation = orbital_rotation
+
         #OCCT secific things
         self.display_connection = Aspect_DisplayConnection()
         self.graphics_driver = OpenGl_GraphicDriver(self.display_connection)
@@ -45,6 +46,13 @@ class OCCTWidget(QWidget):
         #Trihedorn, lights, etc
         self.prepare_display()
         
+
+    def set_orbital_rotation(self, new_value: bool):
+        if self._orbital_rotation != new_value:
+            self._orbital_rotation = new_value
+            if self._orbital_rotation:
+                self.view.SetUp(0, 0, 1)
+
     def prepare_display(self):
         
         view = self.view
@@ -68,9 +76,12 @@ class OCCTWidget(QWidget):
         ctx.DefaultDrawer().SetFaceBoundaryDraw(True)
         
     def wheelEvent(self, event):
-        
-        delta = event.angleDelta().y()
-        factor = ZOOM_STEP if delta<0 else 1/ZOOM_STEP
+
+        # dividing by 120 gets number of notches on a typical scroll wheel.
+        # See QWheelEvent documentation
+        delta_notches = event.angleDelta().y() / 120
+        direction = math.copysign(1, delta_notches)
+        factor = (1 + self._zoom_step * direction) ** abs(delta_notches)
         
         self.view.SetZoom(factor)
         
@@ -79,11 +90,12 @@ class OCCTWidget(QWidget):
         pos = event.pos()
         
         if event.button() == Qt.LeftButton:
-            self.view.StartRotation(pos.x(), pos.y())
+            if not self._orbital_rotation:
+                self.view.StartRotation(pos.x(), pos.y())
         elif event.button() == Qt.RightButton:
             self.view.StartZoomAtPoint(pos.x(), pos.y())
         
-        self.old_pos = pos
+        self._old_pos = pos
         self.blockSelection = False
 
     def mouseDoubleClickEvent(self,event):
@@ -97,17 +109,25 @@ class OCCTWidget(QWidget):
         x,y = pos.x(),pos.y()
         
         if event.buttons() == Qt.LeftButton:
-            self.view.Rotation(x,y)
-            
+            if self._orbital_rotation:
+                delta_x, delta_y = x - self._old_pos.x(), y - self._old_pos.y()
+                cam = self.view.Camera()
+                z_rotation = gp_Trsf()
+                z_rotation.SetRotation(gp_Ax1(cam.Center(), gp_Dir(0, 0, 1)), -delta_x * self._rotate_step)
+                cam.Transform(z_rotation)
+                self.view.Rotate(0, -delta_y * self._rotate_step, 0)
+            else:
+                self.view.Rotation(x, y)
+
         elif event.buttons() == Qt.MiddleButton:
-            self.view.Pan(x - self.old_pos.x(),
-                          self.old_pos.y() - y, theToStart=True)
-            
+            delta_x, delta_y = x - self._old_pos.x(), y - self._old_pos.y()
+            self.view.Pan(delta_x, -delta_y, theToStart=True)
+
         elif event.buttons() == Qt.RightButton:
-            self.view.ZoomAtPoint(self.old_pos.x(), y,
-                                  x, self.old_pos.y())
-        
-        self.old_pos = pos
+            self.view.ZoomAtPoint(self._old_pos.x(), y,
+                                  x, self._old_pos.y())
+
+        self._old_pos = pos
         self.blockSelection = True
         
     def mouseReleaseEvent(self,event):
@@ -115,8 +135,7 @@ class OCCTWidget(QWidget):
         if event.button() == Qt.LeftButton:
             if not self.blockSelection:
                 pos = event.pos()
-                x,y = pos.x(),pos.y()
-                self.context.MoveTo(x,y,self.view,True)
+                self.context.MoveTo(pos.x(), pos.y(), self.view, True)
                 self._handle_selection()
 
     def _handle_selection(self):

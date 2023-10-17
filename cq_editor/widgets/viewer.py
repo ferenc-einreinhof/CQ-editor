@@ -39,6 +39,7 @@ class OCCViewer(QWidget,ComponentMixin):
         {'name': 'Default object color', 'type': 'color', 'value': "#FF0"},
         {'name': 'Deviation', 'type': 'float', 'value': 1e-5, 'dec': True, 'step': 1},
         {'name': 'Angular deviation', 'type': 'float', 'value': 0.1, 'dec': True, 'step': 1},
+        {'name': 'Orbital rotation', 'type': 'bool', 'value': True},
         {'name': 'Projection Type', 'type': 'list', 'value': 'Orthographic',
          'values': ['Orthographic', 'Perspective', 'Stereo', 'MonoLeftEye', 'MonoRightEye']},
         {'name': 'Stereo Mode', 'type': 'list', 'value': 'QuadBuffer',
@@ -89,6 +90,7 @@ class OCCViewer(QWidget,ComponentMixin):
         if not self.preferences['Use gradient']:
             color2 = color1
         self.canvas.view.SetBgGradientColors(color1,color2,theToUpdate=True)
+        self.canvas.set_orbital_rotation(self.preferences['Orbital rotation'])
 
         self.canvas.update()
 
