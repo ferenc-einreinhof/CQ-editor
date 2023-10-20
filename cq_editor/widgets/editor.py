@@ -17,6 +17,14 @@ from ..utils import get_save_filename, get_open_filename, confirm
 
 from ..icons import icon
 
+def getAllFilesInDirectoryRecursive(directory, extension):
+    allFiles = []
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.endswith(extension):
+                allFiles.append(os.path.join(root, file))
+    return allFiles
+
 class Editor(CodeEditor,ComponentMixin):
 
     name = 'Code Editor'
@@ -226,7 +234,11 @@ class Editor(CodeEditor,ComponentMixin):
 
     def _watch_paths(self):
         if Path(self._filename).exists():
-            self._file_watcher.addPath(self._filename)
+            dirName = os.path.dirname(self._filename)
+            allFiles = getAllFilesInDirectoryRecursive(dirName, '.py');
+            for file in allFiles:
+                self._file_watcher.addPath(file)
+
             if self.preferences['Autoreload: watch imported modules']:
                 module_paths =  self.get_imported_module_paths(self._filename)
                 if module_paths:
