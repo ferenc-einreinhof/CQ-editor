@@ -7,6 +7,11 @@ from OCP.OpenGl import OpenGl_GraphicDriver
 from OCP.Quantity import Quantity_Color
 from OCP.V3d import V3d_Viewer
 from OCP.gp import gp_Trsf, gp_Ax1, gp_Dir
+
+# from OCP.Image import Image_AlienPixMap, Image_Format
+# from OCP.StdSelect import StdSelect_TypeOfSelectionImage
+# from OCP.TCollection import TCollection_AsciiString
+
 from PyQt5.QtCore import pyqtSignal, Qt, QPoint
 from PyQt5.QtWidgets import QWidget
 
@@ -39,8 +44,10 @@ class OCCTWidget(QWidget):
         
         self.viewer = V3d_Viewer(self.graphics_driver)
         self.view = self.viewer.CreateView()
+        # self.setMouseTracking(True)
         self.context = AIS_InteractiveContext(self.viewer)
         self.blockSelection = False
+        self.doubleClicked = False
         # self.lastSelected = None
         
         #Trihedorn, lights, etc
@@ -86,7 +93,8 @@ class OCCTWidget(QWidget):
         self.view.SetZoom(factor)
         
     def mousePressEvent(self,event):
-        
+
+        self.doubleClicked = False
         pos = event.pos()
         
         if event.button() == Qt.LeftButton:
@@ -100,14 +108,13 @@ class OCCTWidget(QWidget):
 
     def mouseDoubleClickEvent(self,event):
 
-        self.blockSelection = True
-        self.context.FitSelected(self.view, 0.33, True)
+        self.doubleClicked = True
 
     def mouseMoveEvent(self,event):
-        
+
         pos = event.pos()
         x,y = pos.x(),pos.y()
-        
+
         if event.buttons() == Qt.LeftButton:
             if self._orbital_rotation:
                 delta_x, delta_y = x - self._old_pos.x(), y - self._old_pos.y()
@@ -131,12 +138,32 @@ class OCCTWidget(QWidget):
         self.blockSelection = True
         
     def mouseReleaseEvent(self,event):
-        
+
         if event.button() == Qt.LeftButton:
             if not self.blockSelection:
                 pos = event.pos()
                 self.context.MoveTo(pos.x(), pos.y(), self.view, True)
-                self._handle_selection()
+
+                if self.doubleClicked:
+                    selector = self.context.MainSelector()
+
+                    # pixMap = Image_AlienPixMap()
+                    # pixMap.InitZero(Image_Format.Image_Format_Gray, 1024, 1024)
+                    # if selector.ToPixMap(pixMap, self.view, StdSelect_TypeOfSelectionImage.StdSelect_TypeOfSelectionImage_NormalizedDepth):
+                    #     pixMap.Save(TCollection_AsciiString("depth.png"))
+
+                    if selector.NbPicked() > 0:
+                        picked = selector.PickedData(1)
+                        pp = picked.Point
+                        np = (pp.X(),pp.Y(),pp.Z())
+                        op = self.view.At()
+                        eye = self.view.Eye()
+                        diff = (np[0]-op[0], np[1]-op[1], np[2]-op[2])
+                        self.view.SetEye(eye[0] + diff[0], eye[1] + diff[1], eye[2] + diff[2])
+                        self.view.SetAt(np[0], np[1], np[2])
+
+                else:
+                    self._handle_selection()
 
     def _handle_selection(self):
         
