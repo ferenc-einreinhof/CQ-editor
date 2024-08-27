@@ -1,3 +1,5 @@
 #!/bin/bash
 
-$HOME/miniforge3/bin/python $(dirname $0)/run.py
+APP_DIR=$(dirname $0)
+cd $APP_DIR
+$HOME/miniforge3/bin/python run.py

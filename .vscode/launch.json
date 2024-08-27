@@ -7,7 +7,7 @@
 
     {
       "name": "Python",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "run.py",
       "console": "integratedTerminal",
