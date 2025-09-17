@@ -166,6 +166,7 @@ class Editor(CodeEditor,ComponentMixin):
         self.set_text_from_file(fname)
         self.filename = fname
         self.reset_modified()
+        self.triggerRerender.emit(True)
 
     def determine_encoding(self, fname):
         if os.path.exists(fname):
