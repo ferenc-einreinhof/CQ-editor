@@ -198,7 +198,10 @@ def set_transparency(ais: AIS_Shape, alpha: float) -> AIS_Shape:
 
     drawer = ais.Attributes()
     drawer.SetupOwnShadingAspect()
-    drawer.ShadingAspect().SetTransparency(1.0 - alpha)
+    # `alpha` is transparency, per the README and show_object docs: 0.0 = fully
+    # opaque, 1.0 = fully transparent. (Upstream briefly treated it as opacity,
+    # i.e. 1.0 - alpha, which inverted existing scripts.)
+    drawer.ShadingAspect().SetTransparency(alpha)
 
     return ais
 
