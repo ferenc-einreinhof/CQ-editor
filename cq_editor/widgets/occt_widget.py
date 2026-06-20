@@ -19,6 +19,10 @@ ZOOM_STEP = 0.9
 class OCCTWidget(QWidget):
 
     sigObjectSelected = pyqtSignal(list)
+    # Emitted once the native GL window has actually been created, so the viewer
+    # can fit/redraw at a point where it takes effect (otherwise shaded faces do
+    # not appear on first display on some drivers).
+    sigFitAll = pyqtSignal()
 
     def __init__(self, parent=None):
 
@@ -244,6 +248,10 @@ class OCCTWidget(QWidget):
         self.view.SetWindow(wins.get(platform, self._get_window_linux)(self.winId()))
 
         self._initialized = True
+
+        # Now that the GL window exists, ask the viewer to fit/redraw so already
+        # displayed objects (e.g. auto-rendered on open) show up shaded.
+        self.sigFitAll.emit()
 
     def _get_window_win(self, wid):
 

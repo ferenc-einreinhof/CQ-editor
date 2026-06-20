@@ -111,6 +111,9 @@ class OCCViewer(QWidget, ComponentMixin):
 
         self.canvas = OCCTWidget()
         self.canvas.sigObjectSelected.connect(self.handle_selection)
+        # Fit/redraw once the GL window is ready, so shaded faces show on first
+        # display (e.g. when a file is auto-rendered on open).
+        self.canvas.sigFitAll.connect(self.fit)
 
         self.create_actions(self)
 
