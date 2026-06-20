@@ -8,13 +8,9 @@ cd "$APP_DIR"
 
 VENV_DIR="$APP_DIR/.venv"
 
-# CQ-editor's 3D viewer uses OpenCASCADE's X11 backend, which needs a real X11
-# window. On a Wayland session Qt would otherwise hand it a Wayland surface,
-# which crashes the app at startup with "X Error: BadWindow". Forcing the X11
-# (xcb) backend routes the window through XWayland and fixes this. Native X11
-# sessions already use xcb, so this is harmless there. Override by exporting
-# QT_QPA_PLATFORM yourself before running.
-export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-xcb}"
+# Note: the Wayland workaround (forcing QT_QPA_PLATFORM=xcb so OpenCASCADE's X11
+# viewer gets a real window) lives in run.py, so it applies no matter how the
+# app is launched.
 
 if [ ! -d "$VENV_DIR" ]; then
     echo "Virtual environment not found at $VENV_DIR"

@@ -44,12 +44,15 @@ VENV_PYTHON="$VENV_DIR/bin/python"
 echo "Upgrading pip ..."
 "$VENV_PYTHON" -m pip install --upgrade pip
 
+# Dependencies are declared in pyproject.toml. Install the project itself in
+# editable mode so the cq-editor entry points work and all dependencies are
+# pulled in. The "test" extra adds pytest and friends.
 if [ "$1" = "--dev" ]; then
-    echo "Installing runtime + development dependencies ..."
-    "$VENV_PYTHON" -m pip install -r requirements.txt -r requirements-dev.txt
+    echo "Installing CQ-editor with test + dev dependencies ..."
+    "$VENV_PYTHON" -m pip install -e ".[test,dev]"
 else
-    echo "Installing runtime dependencies ..."
-    "$VENV_PYTHON" -m pip install -r requirements.txt
+    echo "Installing CQ-editor and its dependencies ..."
+    "$VENV_PYTHON" -m pip install -e .
 fi
 
 echo

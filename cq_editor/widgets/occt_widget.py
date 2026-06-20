@@ -1,232 +1,264 @@
-import math
 from sys import platform
 
-from OCP.AIS import AIS_InteractiveContext, AIS_DisplayMode
+
+from PyQt5.QtWidgets import QWidget, QApplication
+from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt, QPoint
+
+import OCP
+
 from OCP.Aspect import Aspect_DisplayConnection, Aspect_TypeOfTriedronPosition
 from OCP.OpenGl import OpenGl_GraphicDriver
-from OCP.Quantity import Quantity_Color
 from OCP.V3d import V3d_Viewer
 from OCP.gp import gp_Trsf, gp_Ax1, gp_Dir
+from OCP.AIS import AIS_InteractiveContext, AIS_DisplayMode
+from OCP.Quantity import Quantity_Color
 
-# from OCP.Image import Image_AlienPixMap, Image_Format
-# from OCP.StdSelect import StdSelect_TypeOfSelectionImage
-# from OCP.TCollection import TCollection_AsciiString
+ZOOM_STEP = 0.9
 
-from PyQt5.QtCore import pyqtSignal, Qt, QPoint
-from PyQt5.QtWidgets import QWidget
 
 class OCCTWidget(QWidget):
-    
-    sigObjectSelected = pyqtSignal(list)
-    sigFitAll = pyqtSignal()
-    
-    def __init__(self, parent=None, *,
-                 orbital_rotation: bool = True,
-                 rotate_step: float = 0.008,
-                 zoom_step: float = 0.1):
 
-        super(OCCTWidget,self).__init__(parent)
-        
+    sigObjectSelected = pyqtSignal(list)
+
+    def __init__(self, parent=None):
+
+        super(OCCTWidget, self).__init__(parent)
+
         self.setAttribute(Qt.WA_NativeWindow)
         self.setAttribute(Qt.WA_PaintOnScreen)
         self.setAttribute(Qt.WA_NoSystemBackground)
-        
+
         self._initialized = False
         self._needs_update = False
-        self._old_pos = QPoint(0, 0)
-        self._rotate_step = rotate_step
-        self._zoom_step = zoom_step
-        self._orbital_rotation = orbital_rotation
+        self._previous_pos = QPoint(
+            0, 0  # Keeps track of where the previous mouse position
+        )
+        self._rotate_step = (
+            0.008  # Controls the speed of rotation with the turntable orbit method
+        )
 
-        #OCCT secific things
+        # Orbit method settings
+        self._orbit_method = "Turntable"
+
+        # Whether double-clicking recenters the view on the picked 3D point
+        self._center_on_double_click = False
+
+        # OCCT secific things
         self.display_connection = Aspect_DisplayConnection()
         self.graphics_driver = OpenGl_GraphicDriver(self.display_connection)
-        
+
         self.viewer = V3d_Viewer(self.graphics_driver)
         self.view = self.viewer.CreateView()
-        # self.setMouseTracking(True)
         self.context = AIS_InteractiveContext(self.viewer)
-        self.blockSelection = False
-        self.doubleClicked = False
-        # self.lastSelected = None
-        
-        #Trihedorn, lights, etc
-        self.prepare_display()
-        
 
-    def set_orbital_rotation(self, new_value: bool):
-        if self._orbital_rotation != new_value:
-            self._orbital_rotation = new_value
-            if self._orbital_rotation:
-                self.view.SetUp(0, 0, 1)
+        # Trihedorn, lights, etc
+        self.prepare_display()
 
     def prepare_display(self):
-        
+
         view = self.view
-        
+
         params = view.ChangeRenderingParams()
         params.NbMsaaSamples = 8
         params.IsAntialiasingEnabled = True
-        
+
         view.TriedronDisplay(
-            Aspect_TypeOfTriedronPosition.Aspect_TOTP_RIGHT_LOWER,
-            Quantity_Color(), 0.1)
-        
+            Aspect_TypeOfTriedronPosition.Aspect_TOTP_RIGHT_LOWER, Quantity_Color(), 0.1
+        )
+
         viewer = self.viewer
-        
+
         viewer.SetDefaultLights()
         viewer.SetLightOn()
-        
+
         ctx = self.context
-        
+
         ctx.SetDisplayMode(AIS_DisplayMode.AIS_Shaded, True)
         ctx.DefaultDrawer().SetFaceBoundaryDraw(True)
-        
+
+    def set_orbit_method(self, method):
+        """
+        Set the orbit method for the OCCT view.
+        """
+
+        # Keep track of which orbit method is used
+        if method == "Turntable":
+            self._orbit_method = "Turntable"
+            self.view.SetUp(0, 0, 1)
+        elif method == "Trackball":
+            self._orbit_method = "Trackball"
+        else:
+            raise ValueError(f"Unknown orbit method: {method}")
+
+    def set_center_on_double_click(self, enabled):
+        """
+        Set whether double-clicking an object recenters the view on the picked
+        3D point.
+        """
+
+        self._center_on_double_click = bool(enabled)
+
     def wheelEvent(self, event):
 
-        # dividing by 120 gets number of notches on a typical scroll wheel.
-        # See QWheelEvent documentation
-        delta_notches = event.angleDelta().y() / 120
-        direction = math.copysign(1, delta_notches)
-        factor = (1 + self._zoom_step * direction) ** abs(delta_notches)
-        
-        self.view.SetZoom(factor)
-        
-    def mousePressEvent(self,event):
+        delta = event.angleDelta().y()
+        factor = ZOOM_STEP if delta < 0 else 1 / ZOOM_STEP
 
-        self.doubleClicked = False
+        self.view.SetZoom(factor)
+
+    def mousePressEvent(self, event):
+
         pos = event.pos()
-        
+
         if event.button() == Qt.LeftButton:
-            if not self._orbital_rotation:
+            # Used to prevent drag selection of objects
+            self.pending_select = True
+            self.left_press = pos
+
+            # We only start the rotation if the orbit method is set to Trackball
+            if self._orbit_method == "Trackball":
                 self.view.StartRotation(pos.x(), pos.y())
         elif event.button() == Qt.RightButton:
             self.view.StartZoomAtPoint(pos.x(), pos.y())
-        
-        self._old_pos = pos
-        self.blockSelection = False
 
-    def mouseDoubleClickEvent(self,event):
+        self._previous_pos = pos
 
-        self.doubleClicked = True
-
-    def mouseMoveEvent(self,event):
+    def mouseMoveEvent(self, event):
 
         pos = event.pos()
-        x,y = pos.x(),pos.y()
+        x, y = pos.x(), pos.y()
 
-        if event.buttons() == Qt.LeftButton:
-            if self._orbital_rotation:
-                delta_x, delta_y = x - self._old_pos.x(), y - self._old_pos.y()
+        # Check for mouse drag rotation
+        if event.buttons() == Qt.LeftButton and event.modifiers() not in (
+            Qt.ShiftModifier,
+            Qt.ControlModifier,
+        ):
+            # Set the rotation differently based on the orbit method
+            if self._orbit_method == "Trackball":
+                self.view.Rotation(x, y)
+            elif self._orbit_method == "Turntable":
+                # Control the turntable rotation manually
+                delta_x, delta_y = (
+                    x - self._previous_pos.x(),
+                    y - self._previous_pos.y(),
+                )
                 cam = self.view.Camera()
                 z_rotation = gp_Trsf()
-                z_rotation.SetRotation(gp_Ax1(cam.Center(), gp_Dir(0, 0, 1)), -delta_x * self._rotate_step)
+                z_rotation.SetRotation(
+                    gp_Ax1(cam.Center(), gp_Dir(0, 0, 1)), -delta_x * self._rotate_step
+                )
                 cam.Transform(z_rotation)
                 self.view.Rotate(0, -delta_y * self._rotate_step, 0)
-            else:
-                self.view.Rotation(x, y)
 
-        elif event.buttons() == Qt.MiddleButton:
-            delta_x, delta_y = x - self._old_pos.x(), y - self._old_pos.y()
-            self.view.Pan(delta_x, -delta_y, theToStart=True)
+        # If the user moves the mouse at all, the selection will not happen
+        if event.buttons() == Qt.LeftButton:
+            if abs(x - self.left_press.x()) > 2 or abs(y - self.left_press.y()) > 2:
+                self.pending_select = False
 
-        elif event.buttons() == Qt.RightButton:
-            self.view.ZoomAtPoint(self._old_pos.x(), y,
-                                  x, self._old_pos.y())
+        if event.buttons() == Qt.MiddleButton or (
+            event.buttons() == Qt.LeftButton and event.modifiers() == Qt.ControlModifier
+        ):
+            self.view.Pan(
+                x - self._previous_pos.x(), self._previous_pos.y() - y, theToStart=True
+            )
 
-        self._old_pos = pos
-        self.blockSelection = True
-        
-    def mouseReleaseEvent(self,event):
+        elif event.buttons() == Qt.RightButton or (
+            event.buttons() == Qt.LeftButton and event.modifiers() == Qt.ShiftModifier
+        ):
+            self.view.ZoomAtPoint(self._previous_pos.x(), y, x, self._previous_pos.y())
+
+        self._previous_pos = pos
+
+    def mouseReleaseEvent(self, event):
 
         if event.button() == Qt.LeftButton:
-            if not self.blockSelection:
-                pos = event.pos()
-                self.context.MoveTo(pos.x(), pos.y(), self.view, True)
+            pos = event.pos()
+            x, y = pos.x(), pos.y()
 
-                if self.doubleClicked:
-                    selector = self.context.MainSelector()
+            # Only make the selection if the user has not moved the mouse
+            if self.pending_select:
+                self.context.MoveTo(x, y, self.view, True)
+                self._handle_selection()
 
-                    # pixMap = Image_AlienPixMap()
-                    # pixMap.InitZero(Image_Format.Image_Format_Gray, 1024, 1024)
-                    # if selector.ToPixMap(pixMap, self.view, StdSelect_TypeOfSelectionImage.StdSelect_TypeOfSelectionImage_NormalizedDepth):
-                    #     pixMap.Save(TCollection_AsciiString("depth.png"))
+    def mouseDoubleClickEvent(self, event):
 
-                    if selector.NbPicked() > 0:
-                        picked = selector.PickedData(1)
-                        pp = picked.Point
-                        np = (pp.X(),pp.Y(),pp.Z())
-                        op = self.view.At()
-                        eye = self.view.Eye()
-                        diff = (np[0]-op[0], np[1]-op[1], np[2]-op[2])
-                        self.view.SetEye(eye[0] + diff[0], eye[1] + diff[1], eye[2] + diff[2])
-                        self.view.SetAt(np[0], np[1], np[2])
+        # Optionally recenter the view on the point that was double-clicked.
+        # Controlled by the "Center view on double-click" viewer preference.
+        if event.button() == Qt.LeftButton and self._center_on_double_click:
+            pos = event.pos()
 
-                else:
-                    self._handle_selection()
+            self.context.MoveTo(pos.x(), pos.y(), self.view, True)
+            selector = self.context.MainSelector()
+            if selector.NbPicked() > 0:
+                picked = selector.PickedData(1).Point
+                new_at = (picked.X(), picked.Y(), picked.Z())
+                old_at = self.view.At()
+                eye = self.view.Eye()
+                diff = (
+                    new_at[0] - old_at[0],
+                    new_at[1] - old_at[1],
+                    new_at[2] - old_at[2],
+                )
+                self.view.SetEye(eye[0] + diff[0], eye[1] + diff[1], eye[2] + diff[2])
+                self.view.SetAt(*new_at)
 
     def _handle_selection(self):
-        
+
         self.context.Select(True)
         self.context.InitSelected()
-        
+
         selected = []
-        # self.lastSelected = None
         if self.context.HasSelectedShape():
-            # self.lastSelected = self.context.SelectedInteractive()
             selected.append(self.context.SelectedShape())
-        
+
         self.sigObjectSelected.emit(selected)
 
     def paintEngine(self):
-    
+
         return None
-    
+
     def paintEvent(self, event):
-        
+
         if not self._initialized:
             self._initialize()
         else:
             self.view.Redraw()
 
     def showEvent(self, event):
-    
-        super(OCCTWidget,self).showEvent(event)
-        
+
+        super(OCCTWidget, self).showEvent(event)
+
     def resizeEvent(self, event):
-        
-        super(OCCTWidget,self).resizeEvent(event)
-        
+
+        super(OCCTWidget, self).resizeEvent(event)
+
         self.view.MustBeResized()
-    
+
     def _initialize(self):
 
         wins = {
-            'darwin' : self._get_window_osx,
-            'linux'  : self._get_window_linux,
-            'win32': self._get_window_win           
+            "darwin": self._get_window_osx,
+            "linux": self._get_window_linux,
+            "win32": self._get_window_win,
         }
 
-        self.view.SetWindow(wins.get(platform,self._get_window_linux)(self.winId()))
-
-        self.sigFitAll.emit()
+        self.view.SetWindow(wins.get(platform, self._get_window_linux)(self.winId()))
 
         self._initialized = True
-        
-    def _get_window_win(self,wid):
-    
+
+    def _get_window_win(self, wid):
+
         from OCP.WNT import WNT_Window
-        
+
         return WNT_Window(wid.ascapsule())
 
-    def _get_window_linux(self,wid):
-        
+    def _get_window_linux(self, wid):
+
         from OCP.Xw import Xw_Window
-        
-        return Xw_Window(self.display_connection,int(wid))
-    
-    def _get_window_osx(self,wid):
-        
+
+        return Xw_Window(self.display_connection, int(wid))
+
+    def _get_window_osx(self, wid):
+
         from OCP.Cocoa import Cocoa_Window
-        
+
         return Cocoa_Window(wid.ascapsule())

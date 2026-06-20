@@ -3,7 +3,9 @@
 [![Build status](https://ci.appveyor.com/api/projects/status/g98rs7la393mgy91/branch/master?svg=true)](https://ci.appveyor.com/project/adam-urbanczyk/cq-editor/branch/master)
 [![codecov](https://codecov.io/gh/CadQuery/CQ-editor/branch/master/graph/badge.svg)](https://codecov.io/gh/CadQuery/CQ-editor)
 [![Build Status](https://dev.azure.com/cadquery/CQ-editor/_apis/build/status/CadQuery.CQ-editor?branchName=master)](https://dev.azure.com/cadquery/CQ-editor/_build/latest?definitionId=3&branchName=master)
-[![DOI](https://zenodo.org/badge/136604983.svg)](https://zenodo.org/badge/latestdoi/136604983)
+[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.3955112-blue.svg)](https://doi.org/10.5281/zenodo.3955112)
+[![Patreon](https://badgen.net/badge/icon/patreon?icon=patreon&label)](https://www.patreon.com/jmwright)
+[![Liberapay](https://badgen.net/badge/icon/liberapay?icon=liberapay&label)](https://liberapay.com/jmwright)
 
 CadQuery GUI editor based on PyQT supports Linux, Windows and Mac.
 
@@ -61,7 +63,7 @@ script is equivalent to:
 ```
 python3 -m venv .venv
 . .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -e .              # dependencies are declared in pyproject.toml
 python run.py
 ```
 
@@ -83,24 +85,24 @@ dnf install -y mesa-libGLU mesa-libGL mesa-libGLU-devel
 
 The 3D viewer uses OpenCASCADE's X11 backend and needs a real X11 window. On a
 Wayland session (the default on recent GNOME/KDE), the app would otherwise crash
-at startup with `X Error: BadWindow`. `run.sh` handles this automatically by
-setting `QT_QPA_PLATFORM=xcb`, which routes the window through XWayland. Make
-sure XWayland is installed (it is by default on most Wayland desktops; on Debian/
-Ubuntu the package is `xwayland`). If you launch `python run.py` directly instead
-of using `run.sh`, set the variable yourself:
-```
-QT_QPA_PLATFORM=xcb python run.py
-```
+at startup with `X Error: BadWindow`. `run.py` handles this automatically by
+setting `QT_QPA_PLATFORM=xcb` on Linux, which routes the window through XWayland,
+so it applies whether you launch via `./run.sh` or `python run.py` directly. Just
+make sure XWayland is installed (it is by default on most Wayland desktops; on
+Debian/Ubuntu the package is `xwayland`).
 
 ### Running the tests
 
 ```
-./setup_venv.sh --dev         # installs pytest and friends into .venv
+./setup_venv.sh --dev         # installs the test dependencies into .venv
 . .venv/bin/activate
-pytest
+pytest                        # on a normal desktop session
 ```
-The GUI tests run headless through `pytest-xvfb`, which requires the `xvfb`
-system package (`sudo apt install xvfb` on Debian/Ubuntu).
+On a machine with a display the tests open real windows. To run them headless
+(e.g. over SSH or in CI), wrap pytest in a virtual X server:
+```
+xvfb-run -a pytest            # needs the `xvfb` system package
+```
 
 ## Usage
 
