@@ -1,0 +1,33 @@
+# Runtime dependencies for CQ-editor (pip / venv install).
+#
+# Install into a virtual environment with:
+#     python3 -m venv .venv
+#     . .venv/bin/activate
+#     pip install -r requirements.txt
+#
+# Versions below are the ones this fork is tested against. They are pinned so
+# that a fresh install keeps working; bump them deliberately, not by accident.
+
+# CadQuery itself. This also pulls in `cadquery-ocp` (the OCP / OpenCASCADE
+# Python bindings) and `path`, so they do not need to be listed separately.
+cadquery==2.7.0
+
+# Qt bindings and widgets used by the GUI.
+PyQt5==5.15.11
+PyQtWebEngine==5.15.7        # required by the embedded Spyder code editor
+pyqtgraph==0.14.0
+qtawesome==1.4.2            # >=1.2.1 is required by Spyder 5
+qtconsole==5.4.1
+
+# Embedded code editor. CQ-editor relies on the module layout of Spyder 5;
+# Spyder 6 reorganised these modules and is not compatible without code changes.
+spyder==5.4.2
+
+# Misc.
+logbook==1.9.2
+requests==2.34.2
+path==17.1.1               # the `path` package (Path.absolute(), .dirname(), ...)
+
+# Spyder and CQ-editor still import `pkg_resources`, which was removed from
+# setuptools 81. Keep setuptools below that until those imports are gone.
+setuptools<81

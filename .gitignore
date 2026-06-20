@@ -1,3 +1,6 @@
+# Local Claude Code launcher (delegates to the shared devbox script; not public)
+/claude
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -34,6 +37,14 @@ MANIFEST
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
+
+# Files written into the working tree by the test suite
+/test.py
+/module.py
+/out.step
+/test_nested_top.py
+/test_nested_bottom.py
+/test_window_title.py
 
 # Unit test / coverage reports
 htmlcov/

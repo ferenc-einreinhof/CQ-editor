@@ -38,35 +38,69 @@ Development builds are also available, but can be unstable and should be used at
 
 On later MacOS versions you may also need `xattr -r -d com.apple.quarantine path/to/CQ-editor-MacOS`.
 
-## Installation (conda/mamba)
+## Installation (pip / virtual environment)
 
-Use conda or mamba to install:
-```
-mamba install -c cadquery -c conda-forge cq-editor=master
-```
-and then simply type `cq-editor` to run it. This installs the latest version built directly from the HEAD of this repository.
+This fork installs everything with `pip` into a local Python virtual environment
+(`.venv`), so **no conda/mamba is required**. You need Python 3.10 or newer.
 
-Alternatively clone this git repository and set up the following conda environment:
+Clone this repository, then run the setup script once to create the virtual
+environment and install all dependencies:
 ```
-mamba env create -f cqgui_env.yml -n cqgui
-mamba activate cqgui
+./setup_venv.sh
+```
+After that, start the application at any time with:
+```
+./run.sh
+```
+`run.sh` activates the `.venv` and launches the editor for you.
+
+### Manual setup
+
+If you prefer to do it by hand (or are on a system without bash), the setup
+script is equivalent to:
+```
+python3 -m venv .venv
+. .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
 python run.py
 ```
 
-If you are concerned about mamba/conda modifying your shell settings, you can use [micromamba](https://mamba.readthedocs.io/en/latest/user_guide/micromamba.html):
-```
-micromamba install -n base -c cadquery cq-editor
-micromamba run -n base cq-editor
-```
+### System packages (Linux)
 
-On some linux distributions (e.g. `Ubuntu 18.04`) it might be necessary to install additonal packages:
+The Qt GUI needs a few X11/OpenGL system libraries that are not installed by
+pip. On Debian/Ubuntu:
 ```
-sudo apt install libglu1-mesa libgl1-mesa-dri mesa-common-dev libglu1-mesa-dev
+sudo apt install libglu1-mesa libgl1-mesa-dri mesa-common-dev libglu1-mesa-dev \
+    libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 \
+    libxcb-xinerama0 libxcb-cursor0
 ```
-On Fedora 29 the packages can be installed as follows:
+On Fedora the mesa packages can be installed as follows:
 ```
 dnf install -y mesa-libGLU mesa-libGL mesa-libGLU-devel
 ```
+
+### Wayland sessions
+
+The 3D viewer uses OpenCASCADE's X11 backend and needs a real X11 window. On a
+Wayland session (the default on recent GNOME/KDE), the app would otherwise crash
+at startup with `X Error: BadWindow`. `run.sh` handles this automatically by
+setting `QT_QPA_PLATFORM=xcb`, which routes the window through XWayland. Make
+sure XWayland is installed (it is by default on most Wayland desktops; on Debian/
+Ubuntu the package is `xwayland`). If you launch `python run.py` directly instead
+of using `run.sh`, set the variable yourself:
+```
+QT_QPA_PLATFORM=xcb python run.py
+```
+
+### Running the tests
+
+```
+./setup_venv.sh --dev         # installs pytest and friends into .venv
+. .venv/bin/activate
+pytest
+```
+The GUI tests run headless through `pytest-xvfb`, which requires the `xvfb`
+system package (`sudo apt install xvfb` on Debian/Ubuntu).
 
 ## Usage
 
