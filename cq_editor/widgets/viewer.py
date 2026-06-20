@@ -260,6 +260,20 @@ class OCCViewer(QWidget, ComponentMixin):
                     shortcut="shift+F10",
                     triggered=self.shaded_view,
                 ),
+                QAction(
+                    qta.icon("fa5s.cube"),
+                    "Perspective view (Shift+F11)",
+                    parent,
+                    shortcut="shift+F11",
+                    triggered=self.perspective_view,
+                ),
+                QAction(
+                    qta.icon("fa5s.vector-square"),
+                    "Orthographic view (Shift+F12)",
+                    parent,
+                    shortcut="shift+F12",
+                    triggered=self.orthographic_view,
+                ),
             ],
             "Tools": [
                 QAction(
@@ -391,6 +405,16 @@ class OCCViewer(QWidget, ComponentMixin):
 
         c = self._get_context()
         c.SetDisplayMode(AIS_WireFrame, True)
+
+    def perspective_view(self):
+
+        # Update the preference so the dropdown stays in sync; the
+        # sigTreeStateChanged signal applies the projection via updatePreferences.
+        self.preferences["Projection Type"] = "Perspective"
+
+    def orthographic_view(self):
+
+        self.preferences["Projection Type"] = "Orthographic"
 
     def show_grid(
         self, step=1.0, size=10.0 + 1e-6, color1=(0.7, 0.7, 0.7), color2=(0, 0, 0)
